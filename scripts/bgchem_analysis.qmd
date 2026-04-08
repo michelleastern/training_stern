@@ -1,9 +1,14 @@
 ---
 title: "Untitled"
-format: html
+format: 
+    html:
+        embed-resources: true
+        toc: true
+        number-sections: true
 ---
 
 # Introduction
+
 ## About the Data
 
 
