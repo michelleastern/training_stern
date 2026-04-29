@@ -1,0 +1,205 @@
+# Clean and wrangle data
+
+## Setup
+
+```{r}
+library(dplyr)
+library(tidyr)
+library(readr)
+```
+
+## Source data
+
+```{r}
+catch_original <- readr::read_csv(file = "https://knb.ecoinformatics.org/knb/d1/mn/v2/object/df35b.302.1")
+
+```
+
+
+
+```{r}
+colnames(catch_original)
+head(catch_original)
+summary(catch_original)
+
+```
+
+## Clean and reshape data
+
+
+```{r}
+#select only desired columns
+catch_data <- catch_original %>%
+    dplyr::select(Region, Year, Chinook, Sockeye, Coho, Pink, Chum)
+
+#check the result
+head(catch_data)
+```
+
+```{r}
+# if you want to rename and select at the same time
+catch_data3 <- catch_original %>%
+    dplyr::select(Region,
+                  Year,
+                  Chinook,
+                  Sockeye,
+                  Coho,
+                  Pink,
+                  Chum,
+                  total = All,
+                  notes = notesRegCode)
+
+catch_data4 <- catch_original %>%
+    dplyr::rename(total = All,
+                  notes = notesRegCode)
+```
+
+
+
+```{r}
+# Check structure of data
+dplyr::glimpse(catch_data)
+```
+
+
+```{r}
+#clean data
+catch_clearn <- catch_data %>% 
+    mutate(Chinook = as.numeric(Chinook))
+```
+
+```{r}
+#find the na's
+i <- which(is.na(catch_clearn$Chinook))
+i
+catch_data[i,]
+```
+```{r}
+#replace the I with 1
+catch_clean <- catch_data %>% 
+    mutate(Chinook = if_else(
+        Chinook == "I",
+        "1",
+        Chinook
+    ),
+    Chinook = as.numeric(Chinook))
+```
+
+```{r}
+catch_long <- catch_clean %>% 
+    pivot_longer(cols = -c(Region, Year),
+        names_to = "Species",
+        values_to = "catch_thousands"
+    )
+
+#check the result
+head(catch_long)
+```
+
+
+```{r}
+#go back to long
+catch_wide <- catch_long %>% 
+    tidyr::pivot_wider(
+        names_from = Species, 
+        values_from = catch_thousands,
+        values_fill = 0)
+
+head(catch_wide)
+```
+
+### Convert to fish numbers
+
+```{r}
+catch_long <- catch_long %>% 
+    mutate(catch = catch_thousands * 1000) %>% 
+    select(-catch_thousands)
+head(catch_long)
+```
+
+
+```{r}
+mean_region <- catch_long %>% 
+    dplyr::group_by(Region) %>% 
+    summarize(mean_catch = mean(catch, na.rm = TRUE), .groups = "drop")
+
+head(mean_region)
+```
+
+
+```{r}
+#filter to just SSE region
+sse_catch <- catch_long %>% 
+    dplyr::filter(Region == "SSE")
+head(sse_catch)
+```
+
+```{r}
+#arrange
+mean_region <- catch_long %>% 
+    dplyr::group_by(Region) %>% 
+    summarize(mean_catch = mean(catch, na.rm = TRUE), .groups = "drop") %>% 
+    arrange(desc(mean_catch))
+
+head(mean_region)
+```
+
+#Experiment with unite and separate
+```{r}
+#experiment
+sites_df <- data.frame(site = c("HAW-101", "HAW-103", "OAH-320", "OAH-219", "MAU-039"))
+
+sites_df %>% 
+    separate_wider_delim(
+        cols=site, 
+        delim = "-",
+        names = c("island", "site_number"),
+        cols_remove = FALSE)
+# Check that out
+head(sites_df)
+```
+
+```{r}
+#Unite
+dates_df <- data.frame(
+    year  = rep(x = "1930", times = 3),
+    month = rep(x = "12",   times = 3),
+    day   = 14:16)
+
+# Check that
+dates_df %>% 
+    unite(
+        col = date,
+        year, month, day,
+        sep = "-",
+        remove = FALSE
+    )
+```
+
+```{r}
+#| label : everything everywhere all at once
+# Grab the data
+catch_original <- readr::read_csv(file = "https://knb.ecoinformatics.org/knb/d1/mn/v2/object/df35b.302.1",
+    show_col_types = FALSE)
+
+# Drop unwanted columns, fix "I" typo, reshape to long, transform catch
+# into individual fish count, calculate mean catch by region, and sort
+# in descending order
+mean_region <- catch_original %>%
+    dplyr::select(-All, -notesRegCode) %>% 
+    dplyr::mutate(
+        Chinook = dplyr::if_else(Chinook == "I", 
+            true = "1", false = Chinook),
+        Chinook = as.numeric(Chinook)) %>% 
+    tidyr::pivot_longer(-c(Region, Year), 
+        names_to = "species", 
+        values_to = "catch") %>%
+    dplyr::mutate(catch = catch*1000) %>% 
+    dplyr::group_by(Region) %>% 
+    dplyr::summarize(mean_catch = mean(catch, na.rm = TRUE),
+        .groups = "drop") %>% 
+    dplyr::arrange(dplyr::desc(mean_catch))
+
+# Check the result
+head(mean_region)
+```
