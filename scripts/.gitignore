@@ -54,3 +54,7 @@ data/ak_regions/
 *.prj
 *.shp
 *.shx
+
+# ignore png
+
+*.png
